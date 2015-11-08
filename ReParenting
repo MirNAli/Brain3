@@ -1,0 +1,47 @@
+/*ReParenting by Mir Nadir Ali
+
+-Before proceeding, ensure that Account object has Braintree ID custom field
+-I used salesforceworkbench to pass Braintree ID and Name to APEX REST endpoint in JSON format in REST POST function request body, eg:
+{"B_ID":"B0007", "N":"Brain5"}
+*/
+
+
+
+@RestResource (urlMapping='/account/brain/*') //(3)APEX REST End point
+global with sharing class ReParenting
+{@HttpPost                                    //(4)the following method accepts Braintree ID and Name from REST POST request body
+    global static void Brain(String B_ID, String N)
+    {                    //B_ID corresponds to Braintree ID, N corresponds Account Name
+    
+        List <Account> acct_Id = [SELECT Id,Name FROM account WHERE  Braintree_ID__c =:B_ID LIMIT 1 ];    
+                         //(6)store account Id which has Braintree ID field = B_ID in acct_Id                                                          
+                         //(5)List size is used to determine if account with B_ID exists
+                         //List acct_Id will have no elements if B_ID  does not exist
+                         
+        if (acct_Id.size()>=1)       //(5)Checking if account with B_ID exists 
+        {                            //(6)If B_ID exists
+         List <Account> parent_Id = [SELECT Id,Name FROM account WHERE (Name=: N AND Braintree_ID__c !=: B_ID AND ParentId=null) LIMIT 1];
+                                     //(6) the SOQL querry tries to find the parent  
+                                     // Account List parent_Id is used to store parent account if it exists
+                                          
+                                                                                                             
+             if(parent_Id.size()>=1)                   //(7)if the parent exists
+             {
+             acct_Id[0].ParentId = parent_Id[0].Id;    //(7)set the newly found parent: parent_Id as parent of acct_Id
+             update acct_Id[0];                        //update the new assignment
+                 
+             }
+        }
+        else              //(8)if account with B_ID does not exist
+        {
+          List <Account> Nacct_ID = [SELECT Id, Name FROM account WHERE Name =: N LIMIT 1]; //(8.1)query for existing Account with Name = N   
+          Account N_Account = new Account (Name = N);  //(8.2)(8.3)create a new account with Name = N
+         
+          if(Nacct_ID.size() >= 1)           //(8.3)if there exists a  record with name = N  
+           {
+               N_Account.ParentId = Nacct_ID[0].Id;      //found record is made parent of the newly created record
+           }
+           insert N_Account;                //update the newly created account to database regardless of weather or not it has a parent
+        }                
+    }
+}
